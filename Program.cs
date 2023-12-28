@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using static Program;
-
 public class Program
 {
     private static List<Catraca> estoqueCatracas = new List<Catraca>();
@@ -42,7 +40,6 @@ public class Program
             Console.ReadKey();
         }
     }
-
     private static void MostrarMenuPrincipal()
     {
         Console.WriteLine("### Menu Principal ###");
@@ -51,7 +48,6 @@ public class Program
         Console.WriteLine("3. Estoque de Canoplas");
         Console.WriteLine("0. Sair");
     }
-
     private static void MenuEstoqueCatracas()
     {
         while (true)
@@ -70,6 +66,9 @@ public class Program
                     AdicionarCatracaEstoque();
                     break;
                 case "3":
+                    PreencherInformacoesAdicionaisEmCatracaExistente();
+                    break;
+                case "4":
                     BuscarPorCodigoCatraca();
                     break;
                 case "0":
@@ -89,7 +88,8 @@ public class Program
         Console.WriteLine("### Estoque de Catracas ###");
         Console.WriteLine("1. Exibir Estoque");
         Console.WriteLine("2. Adicionar Catraca");
-        Console.WriteLine("3. Buscar por Código");
+        Console.WriteLine("3. Preencher Informações em Catraca Existente");
+        Console.WriteLine("4. Buscar por Código");
         Console.WriteLine("0. Voltar ao Menu Principal");
     }
     // métodos do Submenu "Estoque de catracas"
@@ -100,6 +100,14 @@ public class Program
         if (estoqueCatracas.Count == 0)
         {
             Console.WriteLine("Não há catracas no estoque.");
+            Console.Write("Deseja adicionar uma catraca? (S/N): ");
+            string resposta = Console.ReadLine();
+
+            if (resposta.Trim().ToUpper() == "S")
+            {
+                AdicionarCatracaEstoque();
+            }
+
             return;
         }
 
@@ -108,10 +116,10 @@ public class Program
 
         foreach (var catraca in estoqueCatracas)
         {
-            Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}", 
+            Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}",
                 catraca.NumeroCatraca,
-                GetModeloPainel(catraca.ModeloPainel),
-                GetMarcaPainel(catraca.MarcaPainel),
+                GetModeloPainel(catraca.ModeloPainelCorrespondente),
+                GetMarcaPainel(catraca.MarcaPainelCorrespondente),
                 catraca.IdCliente,
                 catraca.NF,
                 catraca.Transportadora,
@@ -119,7 +127,18 @@ public class Program
                 catraca.Saida?.ToString("dd/MM/yy") ?? "-",
                 catraca.CodigoCatraca);
         }
+    
+
+    Console.Write("Deseja adicionar uma catraca? (S/N): ");
+        string respostaAdicao = Console.ReadLine();
+
+        if (respostaAdicao.Trim().ToUpper() == "S")
+        {
+            AdicionarCatracaEstoque();
+        }
     }
+
+
 
 
     private static void AdicionarCatracaEstoque()
@@ -128,6 +147,7 @@ public class Program
 
         Console.Write("Digite o Número do Painel: ");
         int numeroPainel = int.Parse(Console.ReadLine());
+        catraca.NumeroPainel = numeroPainel.ToString();
 
         // Buscar o painel no estoque pelo número informado
         var painelCorrespondente = estoquePaineis.FirstOrDefault(p => p.NumeroPainel == numeroPainel);
@@ -135,12 +155,13 @@ public class Program
         if (painelCorrespondente != null)
         {
             // Atualizar para atribuir automaticamente a marca e o modelo do painel
-            catraca.Modelo = GetModeloCatraca(painelCorrespondente.ModeloPainel);
-            catraca.Marca = GetMarcaCatraca(painelCorrespondente.Marca);
+            catraca.ModeloPainelCorrespondente = painelCorrespondente.ModeloPainel;
+            catraca.MarcaPainelCorrespondente = painelCorrespondente.Marca;
 
             // Solicitar obrigatoriamente o número da Canopla
             Console.Write("Digite o Número da Canopla: ");
-            catraca.CodigoCanopla = Console.ReadLine();
+            catraca.Canopla = Console.ReadLine();
+            
 
             PreencherInformacoesCatraca(catraca, painelCorrespondente.ModeloPainel, painelCorrespondente.Marca);
 
@@ -153,7 +174,7 @@ public class Program
             Console.WriteLine("Painel não encontrado. Verifique o número do painel e tente novamente.");
         }
     }
-
+   
     private static void PreencherInformacoesCatraca(Catraca catraca, ModeloPainel modeloPainel, MarcaPainel marcaPainel)
     {
         Console.Write("Digite o Número da Catraca: ");
@@ -178,27 +199,96 @@ public class Program
             catraca.Transportadora = Console.ReadLine();
         }
 
-        Console.Write("Digite a Data de Entrada (Formato: dd/MM/yy ou dd/MM/yyyy): ");
+        // **Armazenar a data de entrada corretamente no objeto catraca**
+        Console.Write("Digite a Data de Entrada : ");
         string entradaInput = Console.ReadLine();
 
         // Continuar pedindo a data até que uma entrada válida seja fornecida
         while (string.IsNullOrWhiteSpace(entradaInput) || !DateTime.TryParseExact(entradaInput, new[] { "dd/MM/yy", "dd/MM/yyyy" }, null, DateTimeStyles.None, out var entrada))
         {
             Console.WriteLine("Formato de data inválido. Por favor, forneça uma data válida.");
-            Console.Write("Digite a Data de Entrada (Formato: dd/MM/yy ou dd/MM/yyyy): ");
+            Console.Write("Digite a Data de Entrada : ");
             entradaInput = Console.ReadLine();
         }
 
-        Console.Write("Digite a Data de Saída (ou deixe em branco se não houver): ");
-        var dataSaidaInput = Console.ReadLine();
-        catraca.Saida = string.IsNullOrWhiteSpace(dataSaidaInput) ? (DateTime?)null : DateTime.ParseExact(dataSaidaInput, "dd/MM/yy", null);
+        catraca.Entrada = DateTime.ParseExact(entradaInput, new[] { "dd/MM/yy", "dd/MM/yyyy" }, null, DateTimeStyles.None);
 
         Console.Write("Responsável Catraca: ");
         catraca.ResponsavelCatraca = Console.ReadLine();
+
+        // Verificar se o nome é válido (não está vazio)
+        while (string.IsNullOrWhiteSpace(catraca.ResponsavelCatraca))
+        {
+            Console.WriteLine("Por favor, digite o nome do responsável.");
+            Console.Write("Responsável Catraca: ");
+            catraca.ResponsavelCatraca = Console.ReadLine();
+        }
+
     }
+    private static void PreencherInformacoesAdicionaisEmCatracaExistente()
+    {
+        Console.Write("Digite o número da catraca: ");
+        int numeroCatraca = int.Parse(Console.ReadLine());
 
+        var catracaExistente = estoqueCatracas.FirstOrDefault(catraca => catraca.NumeroCatraca == numeroCatraca);
 
+        if (catracaExistente != null)
+        {
+            // Preencher apenas as informações adicionais que faltam
+            if (string.IsNullOrWhiteSpace(catracaExistente.NF) || string.IsNullOrWhiteSpace(catracaExistente.Transportadora) || catracaExistente.Saida == null)
+            {
+                PreencherInformacoesAdicionais(catracaExistente);
+            }
 
+            Console.WriteLine("\nInformações adicionais preenchidas com sucesso!");
+        }
+        else
+        {
+            Console.WriteLine("\nCatraca não encontrada no estoque.");
+        }
+    }
+    private static void PreencherInformacoesAdicionais(Catraca catraca)
+    {
+        // Verificar se a NF está vazia para decidir se deve solicitar o ID do Cliente e a Transportadora
+        if (string.IsNullOrWhiteSpace(catraca.NF))
+        {
+            Console.Write("Digite a NF: ");
+            catraca.NF = Console.ReadLine();
+
+            // Ao adicionar NF, o ID do Cliente será obrigatório
+            Console.Write("Digite o ID do Cliente: ");
+            catraca.IdCliente = Console.ReadLine();
+
+            // Ao adicionar NF, a Transportadora será obrigatória
+            Console.Write("Digite a Transportadora: ");
+            catraca.Transportadora = Console.ReadLine();
+        }
+
+        // Solicitar a Data de Saída se não estiver preenchida
+        if (!catraca.Saida.HasValue)
+        {
+            Console.Write("Digite a Data de Saída (ou deixe em branco se não houver): ");
+            var dataSaidaInput = Console.ReadLine();
+
+            DateTime? dataSaida = null;
+
+            if (!string.IsNullOrWhiteSpace(dataSaidaInput))
+            {
+                // Tenta analisar a data no formato DD/MM/AA ou DD/MM/AAAA
+                if (DateTime.TryParseExact(dataSaidaInput, new[] { "dd/MM/yy", "dd/MM/yyyy" }, null, System.Globalization.DateTimeStyles.None, out var parsedDate))
+                {
+                    dataSaida = parsedDate;
+                }
+                else
+                {
+                    Console.WriteLine("Formato de data inválido. Por favor, insira a data no formato DD/MM/AA ou DD/MM/AAAA.");
+                    // Você pode optar por pedir a entrada novamente ou tomar outra ação apropriada aqui
+                }
+            }
+
+            catraca.Saida = dataSaida;
+        }
+    }
     private static ModeloCatraca GetModeloCatraca(ModeloPainel modeloPainel)
     {
         switch (modeloPainel)
@@ -212,8 +302,6 @@ public class Program
                 throw new InvalidOperationException("Modelo de catraca não reconhecido.");
         }
     }
-
-
     private static MarcaCatraca GetMarcaCatraca(MarcaPainel marcaPainel)
     {
         switch (marcaPainel)
@@ -227,8 +315,6 @@ public class Program
                 throw new InvalidOperationException("Marca de catraca não reconhecida.");
         }
     }
-
-  
     private static string GetModelo(ModeloCatraca modeloCatraca, MarcaPainel marcaPainel)
     {
         string modeloCatracaStr = GetModeloCatraca(modeloCatraca);
@@ -236,7 +322,6 @@ public class Program
 
         return $"{modeloCatracaStr} {marcaPainelStr}";
     }
-
     private static string GetModeloCatraca(ModeloCatraca modeloCatraca)
     {
         switch (modeloCatraca)
@@ -250,7 +335,6 @@ public class Program
                 throw new InvalidOperationException("Modelo de catraca não reconhecido.");
         }
     }
-
     private static void BuscarPorCodigoCatraca()
     {
         Console.Write("Digite o código da catraca: ");
@@ -270,24 +354,22 @@ public class Program
     }
     private static void ExibirDetalhesCatraca(Catraca catraca)
     {
-        Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4,-15} {5,-15} {6,-15} {7,-25} {8,-15}",
-            "Número", "Modelo", "Marca", "ID Cliente", "Nota Fiscal", "Transportadora", "Entrada", "Saída", "Código");
-
-        Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4,-15} {5,-15} {6,-15} {7,-25} {8,-15}",
-            catraca.NumeroCatraca,
-            GetModeloPainel(catraca.ModeloPainel),
-            GetMarcaPainel(catraca.MarcaPainel),
-            catraca.IdCliente,
-            catraca.NF,
-            catraca.Transportadora,
-            catraca.Entrada.ToString("dd/MM/yy"),
-            catraca.Saida?.ToString("dd/MM/yy") ?? "-",
-            catraca.CodigoCatraca);
+        Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}",
+           "Número", "Modelo do Painel", "Marca do Painel", "ID Cliente", "Nota Fiscal", "Transportadora", "Entrada", "Saída", "Código");
+        {
+            Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}",
+                catraca.NumeroCatraca,
+                GetModeloPainel(catraca.ModeloPainelCorrespondente),
+                GetMarcaPainel(catraca.MarcaPainelCorrespondente),
+                catraca.IdCliente,
+                catraca.NF,
+                catraca.Transportadora,
+                catraca.Entrada.ToString("dd/MM/yy"),
+                catraca.Saida?.ToString("dd/MM/yy") ?? "-",
+                catraca.CodigoCatraca);
+        }
     }
-
     //fim do "estoque de catracas"
-
-
     //menu estoque de paineis
     private static void MenuEstoquePaineis()
     {
@@ -352,7 +434,6 @@ public class Program
                 painelTestado.ResponsavelPainel);
         }
     }
-
     private static string GetModeloPainel(ModeloPainel modelo)
     {
         switch (modelo)
@@ -366,7 +447,6 @@ public class Program
                 throw new InvalidOperationException("Modelo de painel não reconhecido.");
         }
     }
-
     private static string GetMarcaPainel(MarcaPainel marca)
     {
         switch (marca)
@@ -380,7 +460,6 @@ public class Program
                 throw new InvalidOperationException("Marca de painel não reconhecido.");
         }
     }
-
     private static void AdicionarPainelEstoque()
     {
         if (estoquePaineis.Count > 0)
@@ -397,8 +476,22 @@ public class Program
             return;
         }
 
-        Console.Write("Digite o Número do Primeiro Painel: ");
-        int numeroPrimeiroPainel = int.Parse(Console.ReadLine());
+        int numeroPrimeiroPainel;
+
+        do
+        {
+            Console.Write("Digite o Número do Primeiro Painel: ");
+            string input = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(input) && int.TryParse(input, out numeroPrimeiroPainel))
+            {
+                break;
+            }
+            else
+            {
+                Console.WriteLine("Por favor, digite um número válido.");
+            }
+        } while (true);
 
         // Verifica se o número do painel já existe no estoque
         while (estoquePaineis.Any(p => p.NumeroPainel == numeroPrimeiroPainel))
@@ -409,28 +502,91 @@ public class Program
         }
 
         var painelTestado = new Painel();
-
         Console.WriteLine($"\n### Informações do Painel {numeroPrimeiroPainel} ###");
 
-        Console.WriteLine("Escolha o Modelo do Painel:");
-        Console.WriteLine("1. DigitalPersona");
-        Console.WriteLine("2. Embarcado");
-        Console.Write("Digite o número correspondente ao Modelo: ");
-        int modeloIndex = int.Parse(Console.ReadLine()) - 1; // Ajuste para o índice do enum
-        painelTestado.ModeloPainel = (ModeloPainel)modeloIndex;
+        // Escolha do Modelo do Painel
+        int modeloIndex;
+        do
+        {
+            Console.WriteLine("Escolha o Modelo do Painel:");
+            Console.WriteLine("1. DigitalPersona");
+            Console.WriteLine("2. Embarcado");
+            Console.Write("Digite o número correspondente ao Modelo: ");
+            string modeloInput = Console.ReadLine();
 
-        Console.WriteLine("Escolha a Marca do Painel:");
-        Console.WriteLine("1. FacilFit");
-        Console.WriteLine("2. Toletus");
-        Console.Write("Digite o número correspondente à Marca: ");
-        int marcaIndex = int.Parse(Console.ReadLine()) - 1; // Ajuste para o índice do enum
-        painelTestado.Marca = (MarcaPainel)marcaIndex;
+            if (int.TryParse(modeloInput, out modeloIndex) && (modeloIndex == 1 || modeloIndex == 2))
+            {
+                break;
+            }
+            else
+            {
+                Console.WriteLine("Por favor, escolha um número válido para o Modelo.");
+            }
+        } while (true);
 
-        Console.Write("Digite a Data do Teste: ");
-        painelTestado.DataTeste = DateTime.Parse(Console.ReadLine());
+        painelTestado.ModeloPainel = (ModeloPainel)(modeloIndex - 1); // Ajuste para o índice do enum
 
-        Console.Write("Digite o Responsável pelo Teste: ");
-        painelTestado.ResponsavelPainel = Console.ReadLine();
+        // Escolha da Marca do Painel
+        int marcaIndex;
+        do
+        {
+            Console.WriteLine("Escolha a Marca do Painel:");
+            Console.WriteLine("1. FacilFit");
+            Console.WriteLine("2. Toletus");
+            Console.Write("Digite o número correspondente à Marca: ");
+            string marcaInput = Console.ReadLine();
+
+            if (int.TryParse(marcaInput, out marcaIndex) && (marcaIndex == 1 || marcaIndex == 2))
+            {
+                break;
+            }
+            else
+            {
+                Console.WriteLine("Por favor, escolha um número válido para a Marca.");
+            }
+        } while (true);
+
+        painelTestado.Marca = (MarcaPainel)(marcaIndex - 1); // Ajuste para o índice do enum
+
+        DateTime dataTeste;
+
+        do
+        {
+            Console.Write("Digite a Data do Teste: ");
+            string dataTesteInput = Console.ReadLine();
+
+            if (DateTime.TryParseExact(dataTesteInput, new[] { "dd/MM/yyyy", "dd/MM/yy" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out dataTeste))
+            {
+                // A data foi inserida corretamente, você pode atribuir à propriedade desejada
+                painelTestado.DataTeste = dataTeste;
+                break; // Sai do loop, pois a data é válida
+            }
+            else
+            {
+                Console.WriteLine("Data inválida. Por favor, insira uma data no formato dd/MM/yyyy ou dd/MM/yy.");
+            }
+        } while (true);
+
+
+        string responsavel;
+
+        do
+        {
+            Console.Write("Digite o Responsável pelo Teste: ");
+            responsavel = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(responsavel))
+            {
+                // O nome do responsável foi inserido corretamente
+                painelTestado.ResponsavelPainel = responsavel;
+                break; // Sai do loop, pois o nome do responsável é válido
+            }
+            else
+            {
+                Console.WriteLine("O nome do responsável é obrigatório. Por favor, informe novamente.");
+            }
+        } while (true);
+
 
         for (int i = 0; i < quantidade; i++)
         {
@@ -452,7 +608,6 @@ public class Program
 
         Console.WriteLine($"{quantidade} painéis adicionados ao estoque. Último painel adicionado: {estoquePaineis.Last().NumeroPainel}");
     }
-
     private static void BuscarPorCodigoPainel()
     {
         Console.Write("Digite o código do painel: ");
@@ -475,7 +630,6 @@ public class Program
         }
     }
     //fim do menu estoque de paineis
-
     //menu estoque de canopla
     private static void MenuEstoqueCanoplas()
     {
@@ -508,7 +662,6 @@ public class Program
             Console.ReadKey();
         }
     }
-
     private static void MostrarSubMenuEstoqueCanoplas()
     {
         Console.WriteLine("### Estoque de Canoplas ###");
@@ -517,7 +670,6 @@ public class Program
         Console.WriteLine("3. Buscar por Código");
         Console.WriteLine("0. Voltar ao Menu Principal");
     }
-
     private static void ExibirEstoqueCanoplas()
     {
         Console.WriteLine("\n### Estoque de Canoplas ###");
@@ -540,7 +692,6 @@ public class Program
                 canopla.CodigoCanopla);
         }
     }
-
     private static void AdicionarCanoplaEstoque()
     {
         Console.Write("Quantas canoplas serão adicionadas? (Pressione 'X' para cancelar): ");
@@ -573,7 +724,7 @@ public class Program
         }
 
 
-        Console.Write("Nome do Responsável pela Entrada da primeira Canopla: ");
+        Console.Write("Nome do Responsável pela Canopla: ");
         string responsavelCanopla = Console.ReadLine();
 
         if (string.IsNullOrWhiteSpace(responsavelCanopla))
@@ -613,7 +764,6 @@ public class Program
 
         Console.WriteLine($"{quantidade} canoplas adicionadas ao estoque. Última canopla adicionada: {estoqueCanoplas.Last().NumeroCanopla}");
     }
-
     private static void BuscarPorCodigoCanopla()
     {
         Console.Write("Digite o código da canopla: ");
@@ -635,7 +785,6 @@ public class Program
             Console.WriteLine("Canopla não encontrada. Verifique o código informado.");
         }
     }
-
     private static string GetModelo(ModeloPainel modelo)
     {
         switch (modelo)
@@ -648,8 +797,6 @@ public class Program
                 return "Desconhecido";
         }
     }
-
-
     private static string GetMarca(MarcaPainel marca)
     {
         switch (marca)
@@ -662,7 +809,6 @@ public class Program
                 return "Desconhecida";
         }
     }
-
     public enum ModeloCatraca
     {
         DigitalPersona,
@@ -673,19 +819,16 @@ public class Program
         FacilFit,
         Toletus
     }
-
     public enum ModeloPainel
     {
         DigitalPersona,
         Embarcado
     }
-
     public enum MarcaPainel
     {
         FacilFit,
         Toletus
     }
-
     public class Painel
     {
         public int NumeroPainel { get; set; }
@@ -702,7 +845,6 @@ public class Program
             set { codigoPainel = value; } // Permitir a atribuição
         }
     }
-
     public class Canopla
     {
         public int NumeroCanopla { get; set; }
@@ -710,31 +852,38 @@ public class Program
         public string ResponsavelCanopla { get; set; }
         public string CodigoCanopla { get; set; } 
     }
-
     public class Catraca
     {
-        public int NumeroCatraca { get; set; }
+        public int NumeroCatraca { get; set; }  
         public ModeloCatraca Modelo { get; set; }
         public MarcaCatraca Marca { get; set; }
-        public ModeloPainel ModeloPainel { get; set; }
-        public MarcaPainel MarcaPainel { get; set; }
+       
         public string IdCliente { get; set; }
         public string NF { get; set; }
         public string Transportadora { get; set; }
         public DateTime Entrada { get; set; }
         public DateTime? Saida { get; set; }
-        public string CodigoCatraca { get; set; }
+        private string codigoCatraca; // Armazenar o valor real da propriedade
+        public ModeloPainel ModeloPainelCorrespondente { get; set; }
+        public MarcaPainel MarcaPainelCorrespondente { get; set; }
+
+        public string CodigoCatraca
+        {
+            get { return GerarCodigoCatraca(this); }
+            set { codigoCatraca = value; } // Permitir a atribuição
+        }
+        public string Canopla { get; set; }
         public string ResponsavelCatraca { get; set; }
-        public string CodigoCanopla { get; set; }
-        public string CodigoPainel { get; set; }
+        public string NumeroPainel { get; set; }
+        public string NumeroCanopla { get; set; }
         public static string GerarCodigoCatraca(Catraca catraca)
         {
             string numeroCatraca = catraca.NumeroCatraca.ToString();
-            string duasLetrasResponsavel = catraca.ResponsavelCatraca.Substring(0, 2);
-            string codigoPainel = catraca.CodigoPainel;
-            string codigoCanopla = catraca.CodigoCanopla;
+            string duasLetrasResponsavel = catraca.ResponsavelCatraca.Substring(0, 2).ToUpper(); // Garantindo letras maiúsculas
+            string numeroPainel = catraca.NumeroPainel; 
+            string numeroCanopla = catraca.Canopla; 
 
-            return $"C{numeroCatraca}{duasLetrasResponsavel}{codigoPainel}{codigoCanopla}";
+            return $"C{numeroCatraca}{duasLetrasResponsavel}-{numeroPainel}-{numeroCanopla}";
         }
 
     }
