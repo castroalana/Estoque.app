@@ -1,7 +1,12 @@
-﻿using System;
+﻿using Firebase.Database;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
+using Firebase.Database.Query;
 public class Program
 {
     private static List<Catraca> estoqueCatracas = new List<Catraca>();
@@ -10,6 +15,17 @@ public class Program
 
     public static void Main()
     {
+        //configuração firebase
+        var cred = GoogleCredential.FromFile(@"C:\Users\Acpast\Desktop\PROJETO CONTROLE PRODUÇÃO\ESTOQUE TOLETUS\CORRIGIDO\ESTOQUE\estoque-4d5c2-firebase-adminsdk-h07rp-cb1daad088.json");
+
+        string path = @"C:\Users\Acpast\Desktop\PROJETO CONTROLE PRODUÇÃO\ESTOQUE TOLETUS\CORRIGIDO\ESTOQUE\estoque-4d5c2-firebase-adminsdk-h07rp-cb1daad088.json";
+        string json = File.ReadAllText(path);
+
+        FirebaseApp.Create(new AppOptions
+        {
+            Credential = GoogleCredential.FromJson(json),
+
+        });
         while (true)
         {
             Console.Clear();
@@ -97,7 +113,11 @@ public class Program
     {
         Console.WriteLine("\n### Estoque de Catracas ###");
 
-        if (estoqueCatracas.Count == 0)
+        // Recuperar catracas do Firebase
+        var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+        var estoqueCatracasFirebase = novoFirebaseClient.Child("estoqueCatracas").OnceAsync<Catraca>().Result.Select(item => item.Object).ToList();
+
+        if (estoqueCatracasFirebase.Count == 0)
         {
             Console.WriteLine("Não há catracas no estoque.");
             Console.Write("Deseja adicionar uma catraca? (S/N): ");
@@ -114,7 +134,7 @@ public class Program
         Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}",
             "Número", "Modelo do Painel", "Marca do Painel", "ID Cliente", "Nota Fiscal", "Transportadora", "Entrada", "Saída", "Código");
 
-        foreach (var catraca in estoqueCatracas)
+        foreach (var catraca in estoqueCatracasFirebase)
         {
             Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}",
                 catraca.NumeroCatraca,
@@ -127,9 +147,10 @@ public class Program
                 catraca.Saida?.ToString("dd/MM/yy") ?? "-",
                 catraca.CodigoCatraca);
         }
-    
 
-    Console.Write("Deseja adicionar uma catraca? (S/N): ");
+
+
+        Console.Write("Deseja adicionar uma catraca? (S/N): ");
         string respostaAdicao = Console.ReadLine();
 
         if (respostaAdicao.Trim().ToUpper() == "S")
@@ -143,42 +164,119 @@ public class Program
 
     private static void AdicionarCatracaEstoque()
     {
+        // Declaração das variáveis
         var catraca = new Catraca();
+        var estoqueCatracasFirebase = new List<Catraca>();
+        var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
 
-        Console.Write("Digite o Número do Painel: ");
-        int numeroPainel = int.Parse(Console.ReadLine());
-        catraca.NumeroPainel = numeroPainel.ToString();
-
-        // Buscar o painel no estoque pelo número informado
-        var painelCorrespondente = estoquePaineis.FirstOrDefault(p => p.NumeroPainel == numeroPainel);
-
-        if (painelCorrespondente != null)
+        // Obter o número do painel
+        int numeroPainel;
+        do
         {
-            // Atualizar para atribuir automaticamente a marca e o modelo do painel
-            catraca.ModeloPainelCorrespondente = painelCorrespondente.ModeloPainel;
-            catraca.MarcaPainelCorrespondente = painelCorrespondente.Marca;
+            Console.Write("Digite o Número do Painel: ");
+            numeroPainel = int.Parse(Console.ReadLine());
+            catraca.NumeroPainel = numeroPainel.ToString();
 
-            // Solicitar obrigatoriamente o número da Canopla
+            // Buscar o painel no estoque pelo número informado
+            var estoquePaineisFirebase = novoFirebaseClient.Child("estoquePaineis").OnceAsync<Painel>().Result.Select(item => item.Object).ToList();
+            var painelCorrespondente = estoquePaineisFirebase.FirstOrDefault(p => p.NumeroPainel == numeroPainel);
+
+            // Verificar se o painel existe
+            if (painelCorrespondente != null)
+            {
+                // Atualizar para atribuir automaticamente a marca e o modelo do painel
+                catraca.ModeloPainelCorrespondente = painelCorrespondente.ModeloPainel;
+                catraca.MarcaPainelCorrespondente = painelCorrespondente.Marca;
+
+                // Obter o estoque de catracas do Firebase
+                estoqueCatracasFirebase = novoFirebaseClient.Child("estoqueCatracas").OnceAsync<Catraca>().Result.Select(item => item.Object).ToList();
+
+                // Verificar se o número do painel já foi utilizado em outra catraca
+                var catracaComMesmoNumeroPainel = estoqueCatracasFirebase.FirstOrDefault(c => c.NumeroPainel == catraca.NumeroPainel);
+
+                if (catracaComMesmoNumeroPainel != null)
+                {
+                    Console.WriteLine($"PAINEL JÁ UTILIZADO NA CATRACA ({catracaComMesmoNumeroPainel.NumeroCatraca}) - INSIRA OUTRO PAINEL");
+                }
+                else
+                {
+                    break; // Sai do loop se o número do painel for válido
+                }
+            }
+            else
+            {
+                Console.WriteLine("Painel não encontrado. Verifique o número do painel e tente novamente.");
+            }
+        } while (true);
+
+        // Solicitar obrigatoriamente o número da Canopla
+        string numeroCanopla;
+        do
+        {
             Console.Write("Digite o Número da Canopla: ");
-            catraca.Canopla = Console.ReadLine();
-            
+            numeroCanopla = Console.ReadLine();
 
-            PreencherInformacoesCatraca(catraca, painelCorrespondente.ModeloPainel, painelCorrespondente.Marca);
+            // Verificar se a canopla existe no estoque do Firebase
+            var catracaComMesmaCanopla = estoqueCatracasFirebase.FirstOrDefault(c => c.Canopla == numeroCanopla);
 
-            catraca.CodigoCatraca = Catraca.GerarCodigoCatraca(catraca);
-            estoqueCatracas.Add(catraca);
-            Console.WriteLine("\nCatraca adicionada ao estoque com sucesso!");
-        }
-        else
-        {
-            Console.WriteLine("Painel não encontrado. Verifique o número do painel e tente novamente.");
-        }
+            if (catracaComMesmaCanopla != null)
+            {
+                Console.WriteLine($"CANOPLA JÁ UTILIZADA NA CATRACA ({catracaComMesmaCanopla.NumeroCatraca}) - INSIRA OUTRA CANOPLA");
+            }
+            else
+            {
+                var canoplaExistente = novoFirebaseClient.Child("estoqueCanoplas").OnceAsync<Canopla>().Result.Select(item => item.Object).FirstOrDefault(c => c.NumeroCanopla.ToString() == numeroCanopla);
+
+                if (canoplaExistente != null)
+                {
+                    catraca.Canopla = numeroCanopla;
+                    break; // Sai do loop se o número da canopla for válido
+                }
+                else
+                {
+                    Console.WriteLine("Canopla não encontrada no estoque. Verifique o número da canopla e tente novamente.");
+                }
+            }
+        } while (true);
+
+        // Preencher informações restantes da catraca e adicioná-la ao estoque
+        PreencherInformacoesCatraca(catraca, catraca.ModeloPainelCorrespondente, catraca.MarcaPainelCorrespondente);
+
+        catraca.CodigoCatraca = Catraca.GerarCodigoCatraca(catraca);
+        estoqueCatracasFirebase.Add(catraca);
+        Console.WriteLine("\nCatraca adicionada ao estoque com sucesso!");
+
+        // Salvar catraca no Firebase
+        novoFirebaseClient.Child("estoqueCatracas").PostAsync(catraca);
     }
-   
+
+
+
+
     private static void PreencherInformacoesCatraca(Catraca catraca, ModeloPainel modeloPainel, MarcaPainel marcaPainel)
     {
-        Console.Write("Digite o Número da Catraca: ");
-        catraca.NumeroCatraca = int.Parse(Console.ReadLine());
+        var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+        var estoqueCatracasFirebase = novoFirebaseClient.Child("estoqueCatracas").OnceAsync<Catraca>().Result.Select(item => item.Object).ToList();
+        string numeroCatracaInput;
+        do
+        {
+            Console.Write("Digite o Número da Catraca: ");
+            numeroCatracaInput = Console.ReadLine();
+
+            // Verificar se a catraca com o mesmo número existe no estoque do Firebase
+            var catracaExistente = estoqueCatracasFirebase.FirstOrDefault(c => c.NumeroCatraca == int.Parse(numeroCatracaInput));
+
+            if (catracaExistente == null)
+            {
+                catraca.NumeroCatraca = int.Parse(numeroCatracaInput);
+                break; // Sai do loop, pois a catraca não existe no estoque
+            }
+            else
+            {
+                Console.WriteLine("Já existe uma catraca com o mesmo número. Escolha outro número.");
+            }
+        } while (true);
+
 
         // Mapeamento do ModeloPainel para ModeloCatraca
         catraca.Modelo = GetModeloCatraca(modeloPainel);
@@ -230,7 +328,16 @@ public class Program
         Console.Write("Digite o número da catraca: ");
         int numeroCatraca = int.Parse(Console.ReadLine());
 
-        var catracaExistente = estoqueCatracas.FirstOrDefault(catraca => catraca.NumeroCatraca == numeroCatraca);
+        // Obter a referência da catraca existente no Firebase
+        var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+
+        var catracaExistente = novoFirebaseClient
+            .Child("estoqueCatracas")
+            .OrderByKey()
+            .OnceAsync<Catraca>()
+            .Result
+            .Select(snapshot => snapshot.Object)
+            .FirstOrDefault(catraca => catraca.NumeroCatraca == numeroCatraca);
 
         if (catracaExistente != null)
         {
@@ -238,31 +345,64 @@ public class Program
             if (string.IsNullOrWhiteSpace(catracaExistente.NF) || string.IsNullOrWhiteSpace(catracaExistente.Transportadora) || catracaExistente.Saida == null)
             {
                 PreencherInformacoesAdicionais(catracaExistente);
-            }
 
-            Console.WriteLine("\nInformações adicionais preenchidas com sucesso!");
+                // Atualizar as informações no Firebase
+                var catracaFirebaseReference = novoFirebaseClient
+                    .Child("estoqueCatracas")
+                    .OrderByKey()
+                    .OnceAsync<Catraca>()
+                    .Result
+                    .Where(snapshot => snapshot.Object.NumeroCatraca == numeroCatraca)
+                    .Select(snapshot => snapshot.Key)
+                    .FirstOrDefault();
+
+                novoFirebaseClient
+                    .Child("estoqueCatracas")
+                    .Child(catracaFirebaseReference)
+                    .PutAsync(catracaExistente);
+
+                Console.WriteLine("\nInformações adicionais preenchidas e salvas com sucesso!");
+            }
+            else
+            {
+                Console.WriteLine("\nTodas as informações adicionais já foram preenchidas anteriormente.");
+            }
         }
         else
         {
             Console.WriteLine("\nCatraca não encontrada no estoque.");
         }
     }
+
     private static void PreencherInformacoesAdicionais(Catraca catraca)
     {
-        // Verificar se a NF está vazia para decidir se deve solicitar o ID do Cliente e a Transportadora
-        if (string.IsNullOrWhiteSpace(catraca.NF))
+        // Solicitar obrigatoriamente a NF, o ID do Cliente e a Transportadora
+        do
         {
-            Console.Write("Digite a NF: ");
-            catraca.NF = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(catraca.NF))
+            {
+                Console.Write("Digite a NF: ");
+                catraca.NF = Console.ReadLine();
+            }
 
-            // Ao adicionar NF, o ID do Cliente será obrigatório
-            Console.Write("Digite o ID do Cliente: ");
-            catraca.IdCliente = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(catraca.IdCliente))
+            {
+                Console.Write("Digite o ID do Cliente: ");
+                catraca.IdCliente = Console.ReadLine();
+            }
 
-            // Ao adicionar NF, a Transportadora será obrigatória
-            Console.Write("Digite a Transportadora: ");
-            catraca.Transportadora = Console.ReadLine();
-        }
+            if (string.IsNullOrWhiteSpace(catraca.Transportadora))
+            {
+                Console.Write("Digite a Transportadora: ");
+                catraca.Transportadora = Console.ReadLine();
+            }
+
+            if (string.IsNullOrWhiteSpace(catraca.NF) || string.IsNullOrWhiteSpace(catraca.IdCliente) || string.IsNullOrWhiteSpace(catraca.Transportadora))
+            {
+                Console.WriteLine("Todos os campos são obrigatórios. Por favor, insira os dados necessários.");
+            }
+
+        } while (string.IsNullOrWhiteSpace(catraca.NF) || string.IsNullOrWhiteSpace(catraca.IdCliente) || string.IsNullOrWhiteSpace(catraca.Transportadora));
 
         // Solicitar a Data de Saída se não estiver preenchida
         if (!catraca.Saida.HasValue)
@@ -282,13 +422,16 @@ public class Program
                 else
                 {
                     Console.WriteLine("Formato de data inválido. Por favor, insira a data no formato DD/MM/AA ou DD/MM/AAAA.");
-                    // Você pode optar por pedir a entrada novamente ou tomar outra ação apropriada aqui
+                   
                 }
             }
 
             catraca.Saida = dataSaida;
         }
     }
+
+
+
     private static ModeloCatraca GetModeloCatraca(ModeloPainel modeloPainel)
     {
         switch (modeloPainel)
@@ -298,7 +441,7 @@ public class Program
             case ModeloPainel.DigitalPersona:
                 return ModeloCatraca.DigitalPersona;
             default:
-                // Adicione um valor padrão ou lance uma exceção, se apropriado.
+               
                 throw new InvalidOperationException("Modelo de catraca não reconhecido.");
         }
     }
@@ -311,7 +454,7 @@ public class Program
             case MarcaPainel.Toletus:
                 return MarcaCatraca.Toletus;
             default:
-                // Adicione um valor padrão ou lance uma exceção, se apropriado.
+              
                 throw new InvalidOperationException("Marca de catraca não reconhecida.");
         }
     }
@@ -331,27 +474,50 @@ public class Program
             case ModeloCatraca.DigitalPersona:
                 return "FacilFit";
             default:
-                // Adicione um valor padrão ou lance uma exceção, se apropriado.
+                
                 throw new InvalidOperationException("Modelo de catraca não reconhecido.");
         }
     }
     private static void BuscarPorCodigoCatraca()
     {
-        Console.Write("Digite o código da catraca: ");
-        string codigo = Console.ReadLine();
-
-        var catracaEncontrada = estoqueCatracas.FirstOrDefault(catraca => catraca.CodigoCatraca == codigo);
-
-        if (catracaEncontrada != null)
+        do
         {
-            Console.WriteLine("\n### Catraca Encontrada ###");
-            ExibirDetalhesCatraca(catracaEncontrada);
-        }
-        else
-        {
-            Console.WriteLine("\nCatraca não encontrada no estoque.");
-        }
+            Console.Write("Digite o código da catraca: ");
+            string codigo = Console.ReadLine();
+
+            var catracaEncontrada = BuscarCatracaPorCodigo(codigo);
+
+            if (catracaEncontrada != null)
+            {
+                Console.WriteLine("\n### Catraca Encontrada ###");
+                ExibirDetalhesCatraca(catracaEncontrada);
+            }
+            else
+            {
+                Console.WriteLine("\nCatraca não encontrada no estoque.");
+            }
+
+            Console.Write("\nDeseja realizar nova consulta? (S/N): ");
+            string resposta = Console.ReadLine();
+
+            if (resposta.ToUpper() != "S")
+            {
+                break;
+            }
+
+        } while (true);
     }
+    private static Catraca BuscarCatracaPorCodigo(string codigo)
+    {
+        var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+
+        var estoqueCatracasFirebase = novoFirebaseClient.Child("estoqueCatracas").OnceAsync<Catraca>().Result.Select(item => item.Object).ToList();
+
+        var catracaEncontrada = estoqueCatracasFirebase.FirstOrDefault(catraca => catraca.CodigoCatraca == codigo);
+
+        return catracaEncontrada;
+    }
+
     private static void ExibirDetalhesCatraca(Catraca catraca)
     {
         Console.WriteLine("{0,-15} {1,-20} {2,-20} {3,-15} {4,-15} {5,-20} {6,-15} {7,-15} {8,-25}",
@@ -410,11 +576,15 @@ public class Program
         Console.WriteLine("3. Buscar por Código");
         Console.WriteLine("0. Voltar ao Menu Principal");
     }
-    private static void ExibirEstoquePaineis()
+    private static async void ExibirEstoquePaineis()
     {
         Console.WriteLine("\n### Estoque de Paineis Testados ###");
 
-        if (estoquePaineis.Count == 0)
+        // Consulta ao Firebase para obter os painéis
+        FirebaseClient firebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+        var paineis = await firebaseClient.Child("estoquePaineis").OnceAsync<Painel>();
+
+        if (paineis == null || !paineis.Any())
         {
             Console.WriteLine("Não há painéis testados no estoque.");
             return;
@@ -423,17 +593,20 @@ public class Program
         Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4,-25} {5,-15}",
             "Número", "Modelo", "Marca", "Data de Teste", "Código", "Responsável");
 
-        foreach (var painelTestado in estoquePaineis)
+        foreach (var painelTestado in paineis)
         {
+            var painel = painelTestado.Object;
+
             Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-15} {4,-25} {5,-15}",
-                painelTestado.NumeroPainel,
-                GetModeloPainel(painelTestado.ModeloPainel),
-                GetMarcaPainel(painelTestado.Marca),
-                painelTestado.DataTeste.ToString("dd/MM/yy"),
-                painelTestado.CodigoPainel,
-                painelTestado.ResponsavelPainel);
+                painel.NumeroPainel,
+                GetModeloPainel(painel.ModeloPainel),
+                GetMarcaPainel(painel.Marca),
+                painel.DataTeste.ToString("dd/MM/yy"),
+                painel.CodigoPainel,
+                painel.ResponsavelPainel);
         }
     }
+
     private static string GetModeloPainel(ModeloPainel modelo)
     {
         switch (modelo)
@@ -460,7 +633,7 @@ public class Program
                 throw new InvalidOperationException("Marca de painel não reconhecido.");
         }
     }
-    private static void AdicionarPainelEstoque()
+    private static async void AdicionarPainelEstoque()
     {
         if (estoquePaineis.Count > 0)
         {
@@ -604,31 +777,53 @@ public class Program
             estoquePaineis.Add(novoPainel);
             string codigoPainel = $"pa{numeroPrimeiroPainel + i}{painelTestado.ResponsavelPainel.Substring(0, 2)}";
             novoPainel.CodigoPainel = codigoPainel;
+            FirebaseClient firebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+            await firebaseClient.Child("estoquePaineis").PostAsync(novoPainel);
+
         }
+
 
         Console.WriteLine($"{quantidade} painéis adicionados ao estoque. Último painel adicionado: {estoquePaineis.Last().NumeroPainel}");
     }
     private static void BuscarPorCodigoPainel()
     {
-        Console.Write("Digite o código do painel: ");
-        string codigoBusca = Console.ReadLine();
-
-        var painelEncontrado = estoquePaineis.FirstOrDefault(p => p.CodigoPainel == codigoBusca);
-
-        if (painelEncontrado != null)
+        do
         {
-            Console.WriteLine("\n### Painel Encontrado ###");
-            Console.WriteLine($"Número do Painel Testado: {painelEncontrado.NumeroPainel}");
-            Console.WriteLine($"Modelo do Painel: {GetModelo(painelEncontrado.ModeloPainel)}");
-            Console.WriteLine($"Marca do Painel: {GetMarca(painelEncontrado.Marca)}");
-            Console.WriteLine($"Data do Teste: {painelEncontrado.DataTeste.ToString("dd/MM/yy")}");
-            Console.WriteLine($"Código do Painel Testado: {painelEncontrado.CodigoPainel}");
-        }
-        else
-        {
-            Console.WriteLine("Painel não encontrado. Verifique o código e tente novamente.");
-        }
+            Console.Write("Digite o código do painel: ");
+            string codigoBusca = Console.ReadLine();
+
+            var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+
+            var estoquePaineisFirebase = novoFirebaseClient.Child("estoquePaineis").OnceAsync<Painel>().Result.Select(item => item.Object).ToList();
+
+            var painelEncontrado = estoquePaineisFirebase.FirstOrDefault(p => p.CodigoPainel == codigoBusca);
+
+            if (painelEncontrado != null)
+            {
+                Console.WriteLine("\n### Painel Encontrado ###");
+                Console.WriteLine($"Número do Painel Testado: {painelEncontrado.NumeroPainel}");
+                Console.WriteLine($"Modelo do Painel: {GetModelo(painelEncontrado.ModeloPainel)}");
+                Console.WriteLine($"Marca do Painel: {GetMarca(painelEncontrado.Marca)}");
+                Console.WriteLine($"Data do Teste: {painelEncontrado.DataTeste.ToString("dd/MM/yy")}");
+                Console.WriteLine($"Código do Painel Testado: {painelEncontrado.CodigoPainel}");
+            }
+            else
+            {
+                Console.WriteLine("Painel não encontrado. Verifique o código e tente novamente.");
+            }
+
+            Console.Write("Deseja fazer uma nova busca? (S/N): ");
+            string resposta = Console.ReadLine();
+
+            if (resposta?.Trim().ToUpper() != "S")
+            {
+                break;
+            }
+
+        } while (true);
     }
+
+
     //fim do menu estoque de paineis
     //menu estoque de canopla
     private static void MenuEstoqueCanoplas()
@@ -670,11 +865,16 @@ public class Program
         Console.WriteLine("3. Buscar por Código");
         Console.WriteLine("0. Voltar ao Menu Principal");
     }
-    private static void ExibirEstoqueCanoplas()
+    private static async Task ExibirEstoqueCanoplas()
     {
         Console.WriteLine("\n### Estoque de Canoplas ###");
 
-        if (estoqueCanoplas.Count == 0)
+        FirebaseClient firebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+
+        // Buscar canoplas do Firebase
+        var response = await firebaseClient.Child("estoqueCanoplas").OnceAsync<Canopla>();
+
+        if (response == null || !response.Any())
         {
             Console.WriteLine("Não há canoplas no estoque.");
             return;
@@ -683,7 +883,7 @@ public class Program
         Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-25}",
             "Número", "Data de Entrada", "Responsável", "Código");
 
-        foreach (var canopla in estoqueCanoplas)
+        foreach (var canopla in response.Select(c => c.Object))
         {
             Console.WriteLine("{0,-15} {1,-15} {2,-15} {3,-25}",
                 canopla.NumeroCanopla,
@@ -692,7 +892,8 @@ public class Program
                 canopla.CodigoCanopla);
         }
     }
-    private static void AdicionarCanoplaEstoque()
+
+    private static async void AdicionarCanoplaEstoque()
     {
         Console.Write("Quantas canoplas serão adicionadas? (Pressione 'X' para cancelar): ");
         string quantidadeInput = Console.ReadLine();
@@ -756,35 +957,56 @@ public class Program
             novaCanopla.CodigoCanopla = codigoCanopla;
 
             estoqueCanoplas.Add(novaCanopla);
+            FirebaseClient firebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+            await firebaseClient.Child("estoqueCanoplas").PostAsync(novaCanopla);
 
             Console.WriteLine($"Canopla {proximoNumeroCanopla} adicionada ao estoque. Código: {codigoCanopla}");
 
             proximoNumeroCanopla++;
+            
         }
+
 
         Console.WriteLine($"{quantidade} canoplas adicionadas ao estoque. Última canopla adicionada: {estoqueCanoplas.Last().NumeroCanopla}");
     }
     private static void BuscarPorCodigoCanopla()
     {
-        Console.Write("Digite o código da canopla: ");
-        string codigoCanopla = Console.ReadLine();
-
-        var canoplaEncontrada = estoqueCanoplas.FirstOrDefault(c => c.CodigoCanopla == codigoCanopla);
-
-        if (canoplaEncontrada != null)
+        do
         {
-            Console.WriteLine("\n### Informações da Canopla Encontrada ###");
-            Console.WriteLine($"Número da Canopla: {canoplaEncontrada.NumeroCanopla}");
-            Console.WriteLine($"Data de Entrada: {canoplaEncontrada.DataEntrada.ToString("dd/MM/yy")}");
-            Console.WriteLine($"Responsável: {canoplaEncontrada.ResponsavelCanopla}");
-            Console.WriteLine($"Código: {canoplaEncontrada.CodigoCanopla}");
-            // Adicione outras informações específicas da canopla, se houver
-        }
-        else
-        {
-            Console.WriteLine("Canopla não encontrada. Verifique o código informado.");
-        }
+            Console.Write("Digite o código da canopla: ");
+            string codigoBusca = Console.ReadLine();
+
+            var novoFirebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+
+            var estoqueCanoplasFirebase = novoFirebaseClient.Child("estoqueCanoplas").OnceAsync<Canopla>().Result.Select(item => item.Object).ToList();
+
+            var canoplaEncontrada = estoqueCanoplasFirebase.FirstOrDefault(c => c.CodigoCanopla == codigoBusca);
+
+            if (canoplaEncontrada != null)
+            {
+                Console.WriteLine("\n### Informações da Canopla Encontrada ###");
+                Console.WriteLine($"Número da Canopla: {canoplaEncontrada.NumeroCanopla}");
+                Console.WriteLine($"Data de Entrada: {canoplaEncontrada.DataEntrada.ToString("dd/MM/yy")}");
+                Console.WriteLine($"Responsável: {canoplaEncontrada.ResponsavelCanopla}");
+                Console.WriteLine($"Código: {canoplaEncontrada.CodigoCanopla}");
+                // Adicione outras informações específicas da canopla, se houver
+            }
+            else
+            {
+                Console.WriteLine("Canopla não encontrada. Verifique o código informado.");
+            }
+
+            Console.Write("Deseja fazer uma nova busca? (S/N): ");
+            string resposta = Console.ReadLine();
+
+            if (resposta?.Trim().ToUpper() != "S")
+            {
+                break;
+            }
+
+        } while (true);
     }
+
     private static string GetModelo(ModeloPainel modelo)
     {
         switch (modelo)
@@ -850,14 +1072,14 @@ public class Program
         public int NumeroCanopla { get; set; }
         public DateTime DataEntrada { get; set; }
         public string ResponsavelCanopla { get; set; }
-        public string CodigoCanopla { get; set; } 
+        public string CodigoCanopla { get; set; }
     }
     public class Catraca
     {
-        public int NumeroCatraca { get; set; }  
+        public int NumeroCatraca { get; set; }
         public ModeloCatraca Modelo { get; set; }
         public MarcaCatraca Marca { get; set; }
-       
+
         public string IdCliente { get; set; }
         public string NF { get; set; }
         public string Transportadora { get; set; }
@@ -880,8 +1102,8 @@ public class Program
         {
             string numeroCatraca = catraca.NumeroCatraca.ToString();
             string duasLetrasResponsavel = catraca.ResponsavelCatraca.Substring(0, 2).ToUpper(); // Garantindo letras maiúsculas
-            string numeroPainel = catraca.NumeroPainel; 
-            string numeroCanopla = catraca.Canopla; 
+            string numeroPainel = catraca.NumeroPainel;
+            string numeroCanopla = catraca.Canopla;
 
             return $"C{numeroCatraca}{duasLetrasResponsavel}-{numeroPainel}-{numeroCanopla}";
         }
