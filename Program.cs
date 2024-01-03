@@ -1,17 +1,16 @@
 ﻿using Firebase.Database;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
 using Firebase.Database.Query;
+
+
 public class Program
 {
-    private static List<Catraca> estoqueCatracas = new List<Catraca>();
+
     private static List<Painel> estoquePaineis = new List<Painel>();
     private static List<Canopla> estoqueCanoplas = new List<Canopla>();
+   
 
     public static void Main()
     {
@@ -25,7 +24,11 @@ public class Program
         {
             Credential = GoogleCredential.FromJson(json),
 
+
         });
+        var firebaseClient = new FirebaseClient("https://estoque-4d5c2-default-rtdb.firebaseio.com/");
+
+
         while (true)
         {
             Console.Clear();
@@ -44,6 +47,9 @@ public class Program
                 case "3":
                     MenuEstoqueCanoplas();
                     break;
+                case "4":
+                    MenuExcluirPeca(firebaseClient);
+                    break;               
                 case "0":
                     Environment.Exit(0);
                     break;
@@ -62,6 +68,7 @@ public class Program
         Console.WriteLine("1. Estoque de Catracas");
         Console.WriteLine("2. Estoque de Paineis");
         Console.WriteLine("3. Estoque de Canoplas");
+        Console.WriteLine("4. Excluir do Estoque");     
         Console.WriteLine("0. Sair");
     }
     private static void MenuEstoqueCatracas()
@@ -147,7 +154,6 @@ public class Program
                 catraca.Saida?.ToString("dd/MM/yy") ?? "-",
                 catraca.CodigoCatraca);
         }
-
 
 
         Console.Write("Deseja adicionar uma catraca? (S/N): ");
@@ -422,7 +428,7 @@ public class Program
                 else
                 {
                     Console.WriteLine("Formato de data inválido. Por favor, insira a data no formato DD/MM/AA ou DD/MM/AAAA.");
-                   
+
                 }
             }
 
@@ -441,7 +447,7 @@ public class Program
             case ModeloPainel.DigitalPersona:
                 return ModeloCatraca.DigitalPersona;
             default:
-               
+
                 throw new InvalidOperationException("Modelo de catraca não reconhecido.");
         }
     }
@@ -454,7 +460,7 @@ public class Program
             case MarcaPainel.Toletus:
                 return MarcaCatraca.Toletus;
             default:
-              
+
                 throw new InvalidOperationException("Marca de catraca não reconhecida.");
         }
     }
@@ -474,7 +480,7 @@ public class Program
             case ModeloCatraca.DigitalPersona:
                 return "FacilFit";
             default:
-                
+
                 throw new InvalidOperationException("Modelo de catraca não reconhecido.");
         }
     }
@@ -616,7 +622,7 @@ public class Program
             case ModeloPainel.Embarcado:
                 return "Embarcado";
             default:
-                // Adicione um valor padrão ou lance uma exceção, se apropriado.
+               
                 throw new InvalidOperationException("Modelo de painel não reconhecido.");
         }
     }
@@ -629,7 +635,7 @@ public class Program
             case MarcaPainel.Toletus:
                 return "Toletus";
             default:
-                // Adicione um valor padrão ou lance uma exceção, se apropriado.
+                
                 throw new InvalidOperationException("Marca de painel não reconhecido.");
         }
     }
@@ -949,7 +955,7 @@ public class Program
                 NumeroCanopla = proximoNumeroCanopla,
                 DataEntrada = dataEntrada,
                 ResponsavelCanopla = responsavelCanopla,
-                // Atribua outras informações específicas da canopla, se houver
+               
             };
 
             // Gerar código da canopla
@@ -963,7 +969,7 @@ public class Program
             Console.WriteLine($"Canopla {proximoNumeroCanopla} adicionada ao estoque. Código: {codigoCanopla}");
 
             proximoNumeroCanopla++;
-            
+
         }
 
 
@@ -989,7 +995,7 @@ public class Program
                 Console.WriteLine($"Data de Entrada: {canoplaEncontrada.DataEntrada.ToString("dd/MM/yy")}");
                 Console.WriteLine($"Responsável: {canoplaEncontrada.ResponsavelCanopla}");
                 Console.WriteLine($"Código: {canoplaEncontrada.CodigoCanopla}");
-                // Adicione outras informações específicas da canopla, se houver
+               
             }
             else
             {
@@ -1006,6 +1012,224 @@ public class Program
 
         } while (true);
     }
+    //excluir peça do estoque
+    public static void MenuExcluirPeca(FirebaseClient firebaseClient)
+    {
+        do
+        {
+            Console.WriteLine("\n### Excluir Peça do Estoque ###");
+            Console.WriteLine("Escolha o tipo de peça a ser excluída:");
+            Console.WriteLine("1. Catraca");
+            Console.WriteLine("2. Painel");
+            Console.WriteLine("3. Canopla");
+            Console.WriteLine("0. Voltar");
+
+            Console.Write("Escolha uma opção: ");
+            string tipoPecaInput = Console.ReadLine(); 
+
+            if (tipoPecaInput == "0")
+            {
+                break;
+            }
+
+            if (!int.TryParse(tipoPecaInput, out int tipoPeca) || tipoPeca < 1 || tipoPeca > 3)
+            {
+                Console.WriteLine("Opção inválida. Tente novamente.");
+                Console.ReadKey(); // Aguarda a entrada do usuário antes de continuar
+                continue;
+            }
+
+            string nomeBanco;
+            switch (tipoPeca)
+            {
+                case 1:
+                    nomeBanco = "estoqueCatracas";
+                    break;
+                case 2:
+                    nomeBanco = "estoquePaineis";
+                    break;
+                case 3:
+                    nomeBanco = "estoqueCanoplas";
+                    break;
+                default:
+                    Console.WriteLine("Opção inválida. Tente novamente.");
+                    continue;
+            }
+
+            Console.WriteLine($"Conectando ao banco {nomeBanco}...");
+
+            string tipoPecaDescricao = ((ModeloEstoque)tipoPeca - 1 == ModeloEstoque.Catraca)
+                ? "Catraca"
+                : ((ModeloEstoque)tipoPeca - 1 == ModeloEstoque.Painel)
+                    ? "Painel"
+                    : "Canopla";
+
+            Console.Write($"Digite o número da {tipoPecaDescricao}: ");
+
+            string numeroBuscaInput = Console.ReadLine();
+
+            if (!int.TryParse(numeroBuscaInput, out int numeroBusca))
+            {
+                Console.WriteLine("Número de peça inválido. Tente novamente.");
+                Console.ReadKey(); // Aguarda a entrada do usuário antes de continuar
+                continue;
+            }
+
+            switch (tipoPeca)
+            {
+                case 1:
+                    ExcluirPecaDoEstoqueCatraca(firebaseClient, nomeBanco, numeroBusca);
+                    break;
+                case 2:
+                    ExcluirPecaDoEstoquePainel(firebaseClient, nomeBanco, numeroBusca);
+                    break;
+                case 3:
+                    ExcluirPecaDoEstoqueCanopla(firebaseClient, nomeBanco, numeroBusca);
+                    break;
+            }
+
+        } while (true);
+    }
+    private static async Task ExcluirPecaDoEstoqueCatraca(FirebaseClient firebaseClient, string nomeBanco, int numeroBusca)
+    {
+        var estoqueCatracasFirebase = firebaseClient.Child(nomeBanco).OnceAsync<Catraca>().Result;
+
+        var catracaEncontrada = estoqueCatracasFirebase
+            .Select(item => item.Object)
+            .FirstOrDefault(c => c.NumeroCatraca == numeroBusca);
+
+        if (catracaEncontrada != null)
+        {
+            Console.WriteLine("\n### Informações da Catraca Encontrada ###");
+            Console.WriteLine($"Número da Catraca: {catracaEncontrada.NumeroCatraca}");
+            Console.WriteLine($"Código: {catracaEncontrada.CodigoCatraca}");
+           
+
+            string catracaKey = estoqueCatracasFirebase
+            .Where(item => item.Object.NumeroCatraca == numeroBusca)
+            .Select(item => item.Key)
+            .FirstOrDefault();
+
+            if (catracaKey != null)
+            {
+                Console.Write("Deseja excluir esta catraca? (S/N): ");
+                string resposta = Console.ReadLine();
+
+                if (resposta?.Trim().ToUpper() == "S")
+                {
+                    await firebaseClient.Child(nomeBanco).Child(catracaKey).DeleteAsync();
+                    Console.WriteLine("\nCatraca excluída do estoque.");
+                }
+                else
+                {
+                    Console.WriteLine("\nOperação de exclusão cancelada.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Catraca não encontrada. Verifique o número informado.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Catraca inexistente. Verifique o número informado.");
+        }
+    }
+    private static async Task ExcluirPecaDoEstoquePainel(FirebaseClient firebaseClient, string nomeBanco, int numeroBusca)
+    {
+        var estoquePaineisFirebase = firebaseClient.Child(nomeBanco).OnceAsync<Painel>().Result;
+
+        var painelEncontrado = estoquePaineisFirebase
+            .Select(item => item.Object)
+            .FirstOrDefault(p => p.NumeroPainel == numeroBusca);
+
+        if (painelEncontrado != null)
+        {
+            Console.WriteLine("\n### Informações do Painel Encontrado ###");
+            Console.WriteLine($"Número do Painel Testado: {painelEncontrado.NumeroPainel}");
+            Console.WriteLine($"Código do Painel Testado: {painelEncontrado.CodigoPainel}");
+           
+
+            string painelKey = estoquePaineisFirebase
+            .Where(item => item.Object.NumeroPainel == numeroBusca)
+            .Select(item => item.Key)
+            .FirstOrDefault();
+
+            if (painelKey != null)
+            {
+                Console.Write("Deseja excluir este painel? (S/N): ");
+                string resposta = Console.ReadLine();
+
+                if (resposta?.Trim().ToUpper() == "S")
+                {
+                    await firebaseClient.Child(nomeBanco).Child(painelKey).DeleteAsync();
+                    Console.WriteLine("\nPainel excluído do estoque.");
+                }
+                else
+                {
+                    Console.WriteLine("\nOperação de exclusão cancelada.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Painel inexistente. Verifique o número informado.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Painel inexistente. Verifique o número informado.");
+        }
+    }
+    private static async Task ExcluirPecaDoEstoqueCanopla(FirebaseClient firebaseClient, string nomeBanco, int numeroBusca)
+    {
+        var estoqueCanoplasFirebase = firebaseClient.Child(nomeBanco).OnceAsync<Canopla>().Result;
+
+        var canoplaEncontrada = estoqueCanoplasFirebase
+            .Select(item => item.Object)
+            .FirstOrDefault(c => c.NumeroCanopla == numeroBusca);
+
+        if (canoplaEncontrada != null)
+        {
+            Console.WriteLine("\n### Informações da Canopla Encontrada ###");
+            Console.WriteLine($"Número da Canopla: {canoplaEncontrada.NumeroCanopla}");
+            Console.WriteLine($"Código da Canopla: {canoplaEncontrada.CodigoCanopla}");
+          
+
+            string canoplaKey = estoqueCanoplasFirebase
+            .Where(item => item.Object.NumeroCanopla == numeroBusca)
+            .Select(item => item.Key)
+            .FirstOrDefault();
+
+            if (canoplaKey != null)
+            {
+                Console.Write("Deseja excluir esta canopla? (S/N): ");
+                string resposta = Console.ReadLine();
+
+                if (resposta?.Trim().ToUpper() == "S")
+                {
+                    await firebaseClient.Child(nomeBanco).Child(canoplaKey).DeleteAsync();
+                    Console.WriteLine("\nCanopla excluída do estoque.");
+                }
+                else
+                {
+                    Console.WriteLine("\nOperação de exclusão cancelada.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Canopla inexistente. Verifique o número informado.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Canopla inexistente. Verifique o número informado.");
+        }
+    }
+
+    // fim excluir peça do estoque
+
+    // relatórios serão aqui
+    //
 
     private static string GetModelo(ModeloPainel modelo)
     {
@@ -1031,6 +1255,16 @@ public class Program
                 return "Desconhecida";
         }
     }
+
+
+    public enum ModeloEstoque
+    {
+        Catraca,
+        Painel,
+        Canopla
+    }
+
+
     public enum ModeloCatraca
     {
         DigitalPersona,
@@ -1051,6 +1285,7 @@ public class Program
         FacilFit,
         Toletus
     }
+
     public class Painel
     {
         public int NumeroPainel { get; set; }
@@ -1066,14 +1301,24 @@ public class Program
             get { return $"PA{NumeroPainel}{ResponsavelPainel.Substring(0, 2)}"; }
             set { codigoPainel = value; } // Permitir a atribuição
         }
+        public string GetKey()
+        {
+            return NumeroPainel.ToString(); 
+        }
     }
+
     public class Canopla
     {
         public int NumeroCanopla { get; set; }
         public DateTime DataEntrada { get; set; }
         public string ResponsavelCanopla { get; set; }
         public string CodigoCanopla { get; set; }
+        public string GetKey()
+        {
+            return NumeroCanopla.ToString(); 
+        }
     }
+
     public class Catraca
     {
         public int NumeroCatraca { get; set; }
@@ -1101,19 +1346,27 @@ public class Program
         public static string GerarCodigoCatraca(Catraca catraca)
         {
             string numeroCatraca = catraca.NumeroCatraca.ToString();
-            string duasLetrasResponsavel = catraca.ResponsavelCatraca.Substring(0, 2).ToUpper(); // Garantindo letras maiúsculas
+            string duasLetrasResponsavel = catraca.ResponsavelCatraca.Substring(0, 2).ToUpper(); 
             string numeroPainel = catraca.NumeroPainel;
             string numeroCanopla = catraca.Canopla;
 
             return $"C{numeroCatraca}{duasLetrasResponsavel}-{numeroPainel}-{numeroCanopla}";
         }
-
+        public string GetKey()
+        {
+            return NumeroCatraca.ToString();
+        }
     }
 
-
-
-
 }
+
+
+
+
+
+
+
+
 
 
 
